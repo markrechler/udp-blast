@@ -1,11 +1,11 @@
 use clap::{App, Arg};
 use socket2::{Domain, Socket, Type};
-use std::{io, net::SocketAddr, net::UdpSocket, rc::Rc};
+use std::{io, net::SocketAddr, net::UdpSocket};
 
 fn main() -> io::Result<()> {
     // Arg Parsing
     let matches = App::new("udp-blast")
-        .version("0.1.0")
+        .version("0.1.1")
         .about("Clone and send UDP packets to n destinations.")
         .arg(
             Arg::with_name("listen")
@@ -37,7 +37,7 @@ fn main() -> io::Result<()> {
             Arg::with_name("receivers")
                 .short("r")
                 .long("receivers")
-                .value_name("SOCKETADDR<[,]SOCKETADDR...>")
+                .value_name("SOCKETADDR<[,SOCKETADDR...]>")
                 .help("Sets the destinations receiving cloned UDP packets.")
                 .required(true)
                 .use_delimiter(true)
@@ -77,20 +77,18 @@ fn main() -> io::Result<()> {
     println!("Starting listener on {:?}.", listen_addr);
     println!("Forwarding packets to {:?}.", recv_vec);
 
-    let sock_clone = Rc::new(sock);
+    let send_sock = UdpSocket::bind("0.0.0.0:0")?;
 
     let mut buf = vec![0u8; buf_size];
     loop {
-        let (len, src) = sock_clone.recv_from(&mut buf)?;
+        let (len, src) = sock.recv_from(&mut buf)?;
         if print_debug {
             println!("Received {:?} bytes from {:?}.", len, src);
         }
         for recv in &recv_vec {
-            let send_rc = recv.clone();
-            let send_clone = sock_clone.clone();
-            send_clone.send_to(&buf[..len], send_rc)?;
+            send_sock.send_to(&buf[..len], recv)?;
             if print_debug {
-                println!("Sent {:?} bytes to {:?}.", len, send_rc);
+                println!("Sent {:?} bytes to {:?}.", len, recv);
             }
         }
     }
